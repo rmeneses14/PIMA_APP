@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PIMA · Dashboard de Precios Mayoristas</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+  <style>
+    /* ── TOKENS ── */
+    :root {
+      --bg:       #0a0f0d;
+      --surface:  #111a14;
+      --card:     #162019;
+      --border:   #1e3022;
+      --green:    #3ddc6e;
+      --green2:   #1fa84a;
+      --amber:    #f0b429;
+      --red:      #e85d5d;
+      --text:     #e8f5ec;
+      --muted:    #7a9982;
+      --font-display: 'Syne', sans-serif;
+      --font-mono:    'JetBrains Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── BACKGROUND GRID ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.4;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── NOISE OVERLAY ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── LAYOUT ── */
+    .layout {
+      position: relative;
+      z-index: 1;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 24px 60px;
+    }
+
+    /* ── HEADER ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 28px 0 24px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-badge {
+      width: 40px; height: 40px;
+      background: var(--green);
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 18px;
+      color: var(--bg);
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 20px;
+      letter-spacing: -0.3px;
+      color: var(--text);
+    }
+
+    .brand-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .header-meta {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 10px var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    #status-text {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* ── CONTROLS ── */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 0 0;
+      flex-wrap: wrap;
+    }
+
+    .label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    select, input[type="text"] {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      min-width: 180px;
+    }
+
+    select:focus, input[type="text"]:focus {
+      border-color: var(--green);
+    }
+
+    .btn {
+      background: var(--green);
+      color: var(--bg);
+      border: none;
+      padding: 8px 18px;
+      border-radius: 6px;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      letter-spacing: 0.02em;
+    }
+
+    .btn:hover  { opacity: 0.85; }
+    .btn:active { transform: scale(0.97); }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .btn-ghost:hover { border-color: var(--green); color: var(--green); }
+
+    /* ── KPI CARDS ── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin: 24px 0;
+    }
+
+    .kpi {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+
+    .kpi::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--green);
+    }
+
+    .kpi:hover { border-color: var(--green2); }
+
+    .kpi-label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .kpi-value {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 26px;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .kpi-value.green  { color: var(--green); }
+    .kpi-value.amber  { color: var(--amber); }
+    .kpi-value.red    { color: var(--red); }
+
+    .kpi-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 5px;
+    }
+
+    /* ── GRID DE SECCIONES ── */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 16px;
+      align-items: start;
+    }
+
+    @media (max-width: 900px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── PANEL GENÉRICO ── */
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: -0.2px;
+    }
+
+    .panel-body {
+      padding: 20px;
+    }
+
+    /* ── CHART CONTAINER ── */
+    .chart-wrap {
+      position: relative;
+      height: 300px;
+    }
+
+    /* ── TABLA DE PRECIOS ── */
+    .price-table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead th {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      text-align: right;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 400;
+    }
+
+    thead th:first-child { text-align: left; }
+
+    tbody tr {
+      transition: background 0.12s;
+    }
+
+    tbody tr:hover { background: rgba(61, 220, 110, 0.04); }
+
+    tbody td {
+      padding: 9px 10px;
+      font-size: 12px;
+      text-align: right;
+      border-bottom: 1px solid rgba(30, 48, 34, 0.5);
+      color: var(--muted);
+    }
+
+    tbody td:first-child {
+      text-align: left;
+      color: var(--text);
+      font-weight: 500;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .badge-up   { color: var(--green); }
+    .badge-down { color: var(--red); }
+
+    /* ── MINI SPARKLINE PROJECTION ── */
+    .projection-panel {
+      margin-top: 16px;
+    }
+
+    .proj-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .proj-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+
+    .proj-item-label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+    }
+
+    .proj-item-value {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 18px;
+    }
+
+    /* ── LIST DE PRODUCTOS SIDEBAR ── */
+    .product-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      max-height: 420px;
+      overflow-y: auto;
+    }
+
+    .product-list::-webkit-scrollbar { width: 4px; }
+    .product-list::-webkit-scrollbar-track { background: transparent; }
+    .product-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .prod-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .prod-item:hover   { background: rgba(61, 220, 110, 0.06); }
+    .prod-item.active  { background: rgba(61, 220, 110, 0.12); }
+
+    .prod-name {
+      font-size: 12px;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 170px;
+    }
+
+    .prod-price {
+      font-size: 11px;
+      color: var(--green);
+      flex-shrink: 0;
+    }
+
+    /* ── LOADER ── */
+    .loader {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+      color: var(--muted);
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── TOOLTIP CUSTOM ── */
+    .trend-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 99px;
+      font-family: var(--font-mono);
+    }
+
+    .trend-up   { background: rgba(61, 220, 110, 0.15); color: var(--green); }
+    .trend-down { background: rgba(232, 93, 93, 0.15);  color: var(--red); }
+    .trend-flat { background: rgba(240, 180, 41, 0.15); color: var(--amber); }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center;
+      padding: 32px 0 0;
+      color: var(--muted);
+      font-size: 11px;
+      border-top: 1px solid var(--border);
+      margin-top: 40px;
+    }
+
+    footer a { color: var(--green); text-decoration: none; }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .fadein { animation: fadeIn 0.4s ease forwards; }
+
+    /* ── ERROR STATE ── */
+    .error-box {
+      background: rgba(232, 93, 93, 0.08);
+      border: 1px solid rgba(232, 93, 93, 0.3);
+      border-radius: 8px;
+      padding: 16px 20px;
+      color: var(--red);
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── HEADER ── -->
+  <header>
+    <div class="brand">
+      <div class="brand-badge">P</div>
+      <div>
+        <div class="brand-title">PIMA · Dashboard</div>
+        <div class="brand-sub">Precios Mayoristas · CENADA · Costa Rica</div>
+      </div>
+    </div>
+    <div class="header-meta">
+      <div class="status-dot"></div>
+      <span id="status-text">Conectando…</span>
+      <span id="last-update" style="font-size:11px;color:var(--muted)"></span>
+    </div>
+  </header>
+
+  <!-- ── CONTROLS ── -->
+  <div class="controls">
+    <span class="label">Producto</span>
+    <input type="text" id="prod-input" placeholder="Ej: tomate, papa, cebolla…" list="prod-list" />
+    <datalist id="prod-list"></datalist>
+
+    <span class="label">Período</span>
+    <select id="dias-select">
+      <option value="15">15 días</option>
+      <option value="30" selected>30 días</option>
+      <option value="60">60 días</option>
+      <option value="90">90 días</option>
+    </select>
+
+    <button class="btn" id="btn-buscar">Analizar</button>
+    <button class="btn btn-ghost" id="btn-reset">Limpiar</button>
+  </div>
+
+  <!-- ── KPIs ── -->
+  <div class="kpi-grid" id="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Fecha boletín</div><div class="kpi-value" id="kpi-fecha" style="font-size:18px">—</div></div>
+    <div class="kpi"><div class="kpi-label">Total productos</div><div class="kpi-value green" id="kpi-total">—</div></div>
+    <div class="kpi"><div class="kpi-label">Precio promedio</div><div class="kpi-value" id="kpi-prom">—</div><div class="kpi-sub" id="kpi-unidad"></div></div>
+    <div class="kpi"><div class="kpi-label">Variación</div><div class="kpi-value" id="kpi-var">—</div><div class="kpi-sub">vs período anterior</div></div>
+    <div class="kpi"><div class="kpi-label">Mínimo período</div><div class="kpi-value green" id="kpi-min">—</div></div>
+    <div class="kpi"><div class="kpi-label">Máximo período</div><div class="kpi-value amber" id="kpi-max">—</div></div>
+  </div>
+
+  <!-- ── MAIN GRID ── -->
+  <div class="main-grid">
+
+    <!-- ─ LEFT COLUMN ─ -->
+    <div style="display:flex;flex-direction:column;gap:16px">
+
+      <!-- Chart principal -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title" id="chart-title">Seleccione un producto</span>
+          <div id="trend-badge-wrap"></div>
+        </div>
+        <div class="panel-body">
+          <div id="chart-loader" class="loader"><div class="spinner"></div><span>Esperando selección…</span></div>
+          <div class="chart-wrap" id="chart-wrap" style="display:none">
+            <canvas id="price-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Proyección -->
+      <div class="panel projection-panel" id="proj-panel" style="display:none">
+        <div class="panel-header">
+          <span class="panel-title">Proyección (7 días)</span>
+          <span style="font-size:11px;color:var(--muted)">Regresión lineal simple</span>
+        </div>
+        <div class="panel-body">
+          <div class="proj-grid" id="proj-grid"></div>
+          <div id="proj-chart-wrap" style="height:120px;margin-top:16px">
+            <canvas id="proj-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla últimos boletines -->
+      <div class="panel" id="table-panel" style="display:none">
+        <div class="panel-header">
+          <span class="panel-title">Detalle de precios</span>
+          <span id="table-subtitle" style="font-size:11px;color:var(--muted)"></span>
+        </div>
+        <div class="panel-body" style="padding:0">
+          <div class="price-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Mínimo</th>
+                  <th>Máximo</th>
+                  <th>Moda</th>
+                  <th>Promedio</th>
+                  <th>Var.</th>
+                </tr>
+              </thead>
+              <tbody id="price-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /left -->
+
+    <!-- ─ RIGHT COLUMN ─ -->
+    <div style="display:flex;flex-direction:column;gap:16px">
+
+      <!-- Top productos del último boletín -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Productos · Último boletín</span>
+          <span id="boletin-date" style="font-size:11px;color:var(--muted)"></span>
+        </div>
+        <div class="panel-body" style="padding:10px">
+          <div id="prod-loader" class="loader" style="height:120px"><div class="spinner"></div><span>Cargando…</span></div>
+          <div class="product-list" id="prod-list-ui"></div>
+        </div>
+      </div>
+
+      <!-- Más caros / más baratos -->
+      <div class="panel" id="top-panel" style="display:none">
+        <div class="panel-header">
+          <span class="panel-title">Top precios hoy</span>
+        </div>
+        <div class="panel-body" style="padding:10px">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:4px 8px 8px">Más caros (promedio)</div>
+          <div id="top-caros"></div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:12px 8px 8px">Más accesibles</div>
+          <div id="top-baratos"></div>
+        </div>
+      </div>
+
+    </div><!-- /right -->
+  </div><!-- /main-grid -->
+
+  <footer>
+    Datos: <a href="https://www.pima.go.cr/boletin/" target="_blank">PIMA · SIMM · CENADA</a> &nbsp;·&nbsp;
+    API: <a href="https://github.com/rmeneses14/PIMA_API" target="_blank">github.com/rmeneses14/PIMA_API</a>
+    &nbsp;·&nbsp; Dashboard generado automáticamente
+  </footer>
+
+</div><!-- /layout -->
+
+<script>
+// ─────────────────────────────────────────────
+//  CONFIG — ajusta la URL cuando tu API esté live
+// ─────────────────────────────────────────────
+const API_BASE = "https://pima-api.onrender.com";
+// Para desarrollo local usa: const API_BASE = "http://localhost:8000";
+
+let priceChart  = null;
+let projChart   = null;
+let currentSerie = null;
+
+// ─────────────────────────────────────────────
+//  UTILS
+// ─────────────────────────────────────────────
+const fmt = n => n != null ? `₡${Number(n).toLocaleString("es-CR")}` : "—";
+const fmtDate = d => {
+  const [y, m, day] = d.split("-");
+  return `${day}/${m}/${y.slice(2)}`;
+};
+
+async function apiFetch(path) {
+  const r = await fetch(`${API_BASE}${path}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+function setStatus(ok, text) {
+  document.querySelector(".status-dot").style.background = ok ? "var(--green)" : "var(--amber)";
+  document.querySelector(".status-dot").style.boxShadow  = ok ? "0 0 10px var(--green)" : "0 0 10px var(--amber)";
+  document.getElementById("status-text").textContent = text;
+}
+
+// ─────────────────────────────────────────────
+//  CARGA INICIAL: productos + resumen
+// ─────────────────────────────────────────────
+async function initDashboard() {
+  try {
+    // Health check
+    await apiFetch("/health");
+    setStatus(true, "API conectada");
+  } catch {
+    setStatus(false, "API no disponible — usando datos demo");
+    loadDemoData();
+    return;
+  }
+
+  try {
+    const data = await apiFetch("/productos");
+    document.getElementById("kpi-total").textContent = data.total;
+    document.getElementById("boletin-date").textContent = fmtDate(data.fecha_boletin);
+    document.getElementById("kpi-fecha").textContent = fmtDate(data.fecha_boletin);
+    document.getElementById("last-update").textContent = `Actualizado ${fmtDate(data.fecha_boletin)}`;
+
+    // Datalist para autocomplete
+    const dl = document.getElementById("prod-list");
+    data.productos.forEach(p => {
+      const opt = document.createElement("option");
+      opt.value = p;
+      dl.appendChild(opt);
+    });
+
+    // Render product list
+    renderProductList(data.productos, null);
+    document.getElementById("prod-loader").style.display = "none";
+  } catch(e) {
+    document.getElementById("prod-loader").innerHTML = `<span style="color:var(--red)">Error cargando productos</span>`;
+  }
+
+  try {
+    const resumen = await apiFetch("/resumen");
+    renderTopPanel(resumen);
+  } catch {}
+}
+
+function renderProductList(productos, activo) {
+  const ul = document.getElementById("prod-list-ui");
+  ul.innerHTML = "";
+  productos.slice(0, 60).forEach(p => {
+    const div = document.createElement("div");
+    div.className = "prod-item" + (p === activo ? " active" : "");
+    div.innerHTML = `<span class="prod-name">${p}</span>`;
+    div.addEventListener("click", () => {
+      document.getElementById("prod-input").value = p;
+      buscarProducto(p);
+    });
+    ul.appendChild(div);
+  });
+}
+
+function renderTopPanel(resumen) {
+  const panel = document.getElementById("top-panel");
+  panel.style.display = "";
+
+  const renderItems = (items, containerId, colorClass) => {
+    const c = document.getElementById(containerId);
+    c.innerHTML = items.map(i => `
+      <div class="prod-item">
+        <span class="prod-name">${i.producto}</span>
+        <span class="prod-price ${colorClass}">${fmt(i.promedio)}</span>
+      </div>`).join("");
+  };
+
+  renderItems(resumen.top_5_mas_caros,   "top-caros",   "badge-up");
+  renderItems(resumen.top_5_mas_baratos, "top-baratos", "badge-down");
+}
+
+// ─────────────────────────────────────────────
+//  BÚSQUEDA DE SERIE DE PRECIOS
+// ─────────────────────────────────────────────
+async function buscarProducto(prod) {
+  if (!prod.trim()) return;
+  const dias = document.getElementById("dias-select").value;
+
+  document.getElementById("chart-loader").style.display = "flex";
+  document.getElementById("chart-loader").innerHTML = `<div class="spinner"></div><span>Cargando serie de ${prod}…</span>`;
+  document.getElementById("chart-wrap").style.display = "none";
+  document.getElementById("proj-panel").style.display = "none";
+  document.getElementById("table-panel").style.display = "none";
+
+  try {
+    const data = await apiFetch(`/precios/${encodeURIComponent(prod)}?dias=${dias}`);
+    currentSerie = data;
+    renderSerie(data);
+  } catch(e) {
+    document.getElementById("chart-loader").innerHTML =
+      `<div class="error-box">No se encontró "${prod}" en los últimos ${dias} días.<br>Intente con otro nombre.</div>`;
+  }
+}
+
+function renderSerie(data) {
+  const { serie, producto } = data;
+  if (!serie || serie.length === 0) return;
+
+  // Actualizar KPIs
+  const proms = serie.map(s => s.promedio).filter(Boolean);
+  const mins  = serie.map(s => s.minimo).filter(Boolean);
+  const maxs  = serie.map(s => s.maximo).filter(Boolean);
+
+  document.getElementById("kpi-prom").textContent = fmt(proms.at(-1));
+  document.getElementById("kpi-unidad").textContent = serie.at(-1)?.unidad || "";
+  document.getElementById("kpi-min").textContent = fmt(Math.min(...mins));
+  document.getElementById("kpi-max").textContent = fmt(Math.max(...maxs));
+
+  // Variación
+  if (proms.length >= 2) {
+    const first = proms[0], last = proms.at(-1);
+    const pct = ((last - first) / first * 100).toFixed(1);
+    const el = document.getElementById("kpi-var");
+    el.textContent = `${pct > 0 ? "+" : ""}${pct}%`;
+    el.className = "kpi-value " + (pct > 0 ? "red" : "green");
+  }
+
+  // Trend badge
+  const trendWrap = document.getElementById("trend-badge-wrap");
+  const slope = linearSlope(proms);
+  let badgeHtml = "";
+  if (slope > 0.01)       badgeHtml = `<span class="trend-badge trend-up">▲ Tendencia alcista</span>`;
+  else if (slope < -0.01) badgeHtml = `<span class="trend-badge trend-down">▼ Tendencia bajista</span>`;
+  else                    badgeHtml = `<span class="trend-badge trend-flat">→ Tendencia estable</span>`;
+  trendWrap.innerHTML = badgeHtml;
+
+  // Chart title
+  document.getElementById("chart-title").textContent = `${producto.charAt(0).toUpperCase() + producto.slice(1)} · Evolución de precios`;
+
+  // Mostrar chart
+  document.getElementById("chart-loader").style.display = "none";
+  document.getElementById("chart-wrap").style.display   = "";
+
+  renderPriceChart(serie);
+  renderProjection(serie);
+  renderTable(serie);
+}
+
+// ─────────────────────────────────────────────
+//  CHART PRINCIPAL
+// ─────────────────────────────────────────────
+function renderPriceChart(serie) {
+  const labels = serie.map(s => fmtDate(s.fecha));
+  const proms  = serie.map(s => s.promedio);
+  const mins   = serie.map(s => s.minimo);
+  const maxs   = serie.map(s => s.maximo);
+
+  if (priceChart) priceChart.destroy();
+
+  const ctx = document.getElementById("price-chart").getContext("2d");
+
+  const greenGrad = ctx.createLinearGradient(0, 0, 0, 300);
+  greenGrad.addColorStop(0, "rgba(61,220,110,0.25)");
+  greenGrad.addColorStop(1, "rgba(61,220,110,0)");
+
+  priceChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Mínimo",
+          data: mins,
+          borderColor: "rgba(61,220,110,0.4)",
+          borderWidth: 1,
+          pointRadius: 0,
+          fill: false,
+          tension: 0.4,
+        },
+        {
+          label: "Promedio",
+          data: proms,
+          borderColor: "#3ddc6e",
+          borderWidth: 2.5,
+          pointRadius: 3,
+          pointBackgroundColor: "#3ddc6e",
+          fill: true,
+          backgroundColor: greenGrad,
+          tension: 0.4,
+        },
+        {
+          label: "Máximo",
+          data: maxs,
+          borderColor: "rgba(240,180,41,0.5)",
+          borderWidth: 1,
+          pointRadius: 0,
+          fill: false,
+          tension: 0.4,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: {
+          labels: { color: "#7a9982", font: { family: "JetBrains Mono", size: 11 }, boxWidth: 12 },
+        },
+        tooltip: {
+          backgroundColor: "#162019",
+          borderColor: "#1e3022",
+          borderWidth: 1,
+          titleColor: "#e8f5ec",
+          bodyColor: "#7a9982",
+          titleFont: { family: "Syne", weight: "700" },
+          bodyFont: { family: "JetBrains Mono", size: 11 },
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ₡${Number(ctx.parsed.y).toLocaleString("es-CR")}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: "#7a9982", font: { family: "JetBrains Mono", size: 10 }, maxTicksLimit: 10 },
+          grid: { color: "rgba(30,48,34,0.6)" },
+        },
+        y: {
+          ticks: {
+            color: "#7a9982",
+            font: { family: "JetBrains Mono", size: 10 },
+            callback: v => `₡${Number(v).toLocaleString("es-CR")}`
+          },
+          grid: { color: "rgba(30,48,34,0.6)" },
+        }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+//  PROYECCIÓN (regresión lineal)
+// ─────────────────────────────────────────────
+function linearSlope(values) {
+  const n = values.length;
+  if (n < 2) return 0;
+  const sumX = values.reduce((a,_,i) => a+i, 0);
+  const sumY = values.reduce((a,v) => a+v, 0);
+  const sumXY = values.reduce((a,v,i) => a+i*v, 0);
+  const sumX2 = values.reduce((a,_,i) => a+i*i, 0);
+  return (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX);
+}
+
+function linearPredict(values, stepsAhead) {
+  const n = values.length;
+  const slope = linearSlope(values);
+  const intercept = (values.reduce((a,v) => a+v, 0)/n) - slope*(n/2);
+  return Array.from({length: stepsAhead}, (_, i) => intercept + slope*(n+i));
+}
+
+function renderProjection(serie) {
+  const proms = serie.map(s => s.promedio).filter(Boolean);
+  if (proms.length < 5) return;
+
+  const DAYS = 7;
+  const projected = linearPredict(proms, DAYS);
+  const lastPrice = proms.at(-1);
+
+  document.getElementById("proj-panel").style.display = "";
+
+  const grid = document.getElementById("proj-grid");
+  grid.innerHTML = [
+    { label: "Precio actual",   value: fmt(lastPrice),          cls: "" },
+    { label: `En ${DAYS} días`, value: fmt(projected.at(-1)),   cls: projected.at(-1) > lastPrice ? "red" : "green" },
+    { label: "Variación proj.", value: `${((projected.at(-1)-lastPrice)/lastPrice*100).toFixed(1)}%`, cls: projected.at(-1) > lastPrice ? "red" : "green" },
+    { label: "Tendencia",       value: linearSlope(proms) > 0 ? "▲ Alza" : "▼ Baja", cls: linearSlope(proms) > 0 ? "red" : "green" },
+  ].map(item => `
+    <div class="proj-item">
+      <div class="proj-item-label">${item.label}</div>
+      <div class="proj-item-value ${item.cls ? "kpi-value "+item.cls : ""}">${item.value}</div>
+    </div>`).join("");
+
+  // Mini chart proyección
+  if (projChart) projChart.destroy();
+  const labels = [
+    ...serie.map(s => fmtDate(s.fecha)),
+    ...Array.from({length: DAYS}, (_, i) => `+${i+1}d`)
+  ];
+  const histData  = [...proms, ...Array(DAYS).fill(null)];
+  const projData  = [...Array(proms.length).fill(null), ...projected];
+
+  const ctx2 = document.getElementById("proj-chart").getContext("2d");
+  projChart = new Chart(ctx2, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Histórico",
+          data: histData,
+          borderColor: "#3ddc6e",
+          borderWidth: 2,
+          pointRadius: 0,
+          fill: false,
+          tension: 0.4,
+          spanGaps: false,
+        },
+        {
+          label: "Proyección",
+          data: projData,
+          borderColor: "#f0b429",
+          borderWidth: 1.5,
+          borderDash: [4, 4],
+          pointRadius: 2,
+          pointBackgroundColor: "#f0b429",
+          fill: false,
+          tension: 0.2,
+          spanGaps: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: { color: "#7a9982", font: { family: "JetBrains Mono", size: 10 }, boxWidth: 10 }
+        },
+        tooltip: {
+          backgroundColor: "#162019",
+          borderColor: "#1e3022",
+          borderWidth: 1,
+          titleColor: "#e8f5ec",
+          bodyColor: "#7a9982",
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ₡${Number(ctx.parsed.y).toLocaleString("es-CR")}`
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: "#7a9982", font: { size: 9 }, maxTicksLimit: 12 }, grid: { color: "rgba(30,48,34,0.4)" } },
+        y: {
+          ticks: {
+            color: "#7a9982", font: { size: 9 },
+            callback: v => `₡${Number(v).toLocaleString("es-CR")}`
+          },
+          grid: { color: "rgba(30,48,34,0.4)" }
+        }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+//  TABLA DETALLE
+// ─────────────────────────────────────────────
+function renderTable(serie) {
+  document.getElementById("table-panel").style.display = "";
+  document.getElementById("table-subtitle").textContent = `${serie.length} registros`;
+
+  const tbody = document.getElementById("price-tbody");
+  const reversed = [...serie].reverse();
+
+  tbody.innerHTML = reversed.map((row, i) => {
+    const prev = reversed[i + 1];
+    let varBadge = "—";
+    if (prev && prev.promedio && row.promedio) {
+      const pct = ((row.promedio - prev.promedio) / prev.promedio * 100).toFixed(1);
+      const cls = pct > 0 ? "badge-up" : "badge-down";
+      varBadge = `<span class="${cls}">${pct > 0 ? "+" : ""}${pct}%</span>`;
+    }
+    return `
+      <tr>
+        <td>${fmtDate(row.fecha)}</td>
+        <td>${fmt(row.minimo)}</td>
+        <td>${fmt(row.maximo)}</td>
+        <td>${fmt(row.moda)}</td>
+        <td style="color:var(--text)">${fmt(row.promedio)}</td>
+        <td>${varBadge}</td>
+      </tr>`;
+  }).join("");
+}
+
+// ─────────────────────────────────────────────
+//  DEMO DATA (cuando la API no está disponible)
+// ─────────────────────────────────────────────
+function loadDemoData() {
+  document.getElementById("kpi-total").textContent = "89";
+  document.getElementById("kpi-fecha").textContent = "Demo";
+  document.getElementById("boletin-date").textContent = "Demo";
+  document.getElementById("prod-loader").style.display = "none";
+
+  const demoProducts = ["Tomate", "Papa", "Cebolla", "Zanahoria", "Lechuga", "Aguacate", "Plátano", "Chayote"];
+  const ul = document.getElementById("prod-list-ui");
+  demoProducts.forEach(p => {
+    const div = document.createElement("div");
+    div.className = "prod-item";
+    div.innerHTML = `<span class="prod-name">${p}</span><span class="prod-price">Demo</span>`;
+    div.addEventListener("click", () => loadDemoSerie(p));
+    ul.appendChild(div);
+  });
+
+  document.getElementById("top-panel").style.display = "";
+  document.getElementById("top-caros").innerHTML = `<div class="prod-item"><span class="prod-name">Aguacate Hass</span><span class="prod-price badge-up">₡2.000</span></div>`;
+  document.getElementById("top-baratos").innerHTML = `<div class="prod-item"><span class="prod-name">Plátano</span><span class="prod-price badge-down">₡28</span></div>`;
+}
+
+function loadDemoSerie(nombre) {
+  const n = 30;
+  const base = 800 + Math.random() * 500;
+  const serie = Array.from({length: n}, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (n - i));
+    const prom = base + Math.sin(i/3)*80 + i*3 + (Math.random()-0.5)*50;
+    return {
+      fecha: date.toISOString().slice(0, 10),
+      producto: nombre,
+      unidad: "Kilo",
+      minimo: prom * 0.85,
+      maximo: prom * 1.15,
+      moda:   prom * 0.98,
+      promedio: prom,
+    };
+  });
+  renderSerie({ serie, producto: nombre });
+}
+
+// ─────────────────────────────────────────────
+//  EVENT LISTENERS
+// ─────────────────────────────────────────────
+document.getElementById("btn-buscar").addEventListener("click", () => {
+  buscarProducto(document.getElementById("prod-input").value);
+});
+
+document.getElementById("prod-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") buscarProducto(e.target.value);
+});
+
+document.getElementById("btn-reset").addEventListener("click", () => {
+  document.getElementById("prod-input").value = "";
+  if (priceChart) priceChart.destroy();
+  if (projChart) projChart.destroy();
+  document.getElementById("chart-wrap").style.display = "none";
+  document.getElementById("chart-loader").style.display = "flex";
+  document.getElementById("chart-loader").innerHTML = `<div class="spinner" style="animation:none;border-top-color:var(--muted)"></div><span>Esperando selección…</span>`;
+  document.getElementById("proj-panel").style.display = "none";
+  document.getElementById("table-panel").style.display = "none";
+  document.getElementById("trend-badge-wrap").innerHTML = "";
+  document.getElementById("chart-title").textContent = "Seleccione un producto";
+  ["kpi-prom","kpi-var","kpi-min","kpi-max"].forEach(id => {
+    document.getElementById(id).textContent = "—";
+    document.getElementById(id).className = "kpi-value";
+  });
+});
+
+// ─────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────
+initDashboard();
+</script>
+</body>
+</html>
