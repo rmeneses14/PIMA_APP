@@ -758,7 +758,8 @@
 
     <span class="label hide-mobile">Período</span>
     <select id="dias-select" class="hide-mobile">
-      <option value="15" selected>15 días</option>
+      <option value="7" selected>7 días</option>
+      <option value="15">15 días</option>
       <option value="30">30 días</option>
       <option value="60">60 días</option>
       <option value="90">90 días</option>
@@ -888,7 +889,8 @@
   <!-- ── MOBILE STICKY BOTTOM BAR ── -->
   <div class="mobile-bottom-bar">
     <select id="dias-select-mobile">
-      <option value="15" selected>15 días</option>
+      <option value="7" selected>7 días</option>
+      <option value="15">15 días</option>
       <option value="30">30 días</option>
       <option value="60">60 días</option>
       <option value="90">90 días</option>
@@ -1099,19 +1101,28 @@ async function buscarProducto(prod) {
   try {
     const data = await apiFetch(`/precios/${encodeURIComponent(prod)}?dias=${dias}`);
     if (!data.serie || data.serie.length === 0) {
+      const prodSafe = prod.replace(/'/g, "\\'");
       document.getElementById("chart-loader").innerHTML =
-        `<div class="error-box">No hay datos de "<strong>${prod}</strong>" en los últimos ${dias} días.<br>
-         <small>Solo hay ${Object.keys(allProducts).length > 0 ? "datos desde el 17 feb" : "datos limitados"} disponibles. Pruebe reducir el período a 15 días.</small></div>`;
+        `<div class="error-box">
+          Sin datos de "<strong>${prod}</strong>" en los últimos ${dias} días.<br>
+          <small>
+            Prueba con:
+            <a href="#" onclick="syncDias('7');buscarProducto('${prodSafe}');return false" style="color:#3ddc6e">7 días</a> ·
+            <a href="#" onclick="syncDias('15');buscarProducto('${prodSafe}');return false" style="color:#3ddc6e">15 días</a>
+          </small>
+        </div>`;
       return;
     }
     currentSerie = data;
     renderSerie(data);
   } catch(e) {
     const isTimeout = e.message && (e.message.includes("504") || e.message.includes("timeout") || e.message.includes("502"));
+    const prodSafe = prod.replace(/'/g, "\\'");
     document.getElementById("chart-loader").innerHTML =
       `<div class="error-box">${isTimeout
-        ? `⏱ El servidor tardó demasiado cargando datos de PIMA para "${prod}".<br><small>Pruebe reducir el período a <a href="#" onclick="syncDias('15');buscarProducto('${prod.replace(/'/g,"\\'")}');return false" style="color:#3ddc6e">15 días</a> (solo usa datos en caché).</small>`
-        : `No se encontró "<strong>${prod}</strong>" en los últimos ${dias} días.<br><small>Solo tenemos datos del 17 feb al 3 mar. Pruebe con 15 días.</small>`
+        ? `⏱ Servidor tardó demasiado. <a href="#" onclick="syncDias('7');buscarProducto('${prodSafe}');return false" style="color:#3ddc6e">Reintentar con 7 días</a>`
+        : `Sin datos de "<strong>${prod}</strong>" en los últimos ${dias} días.
+           <br><small>Prueba con: <a href="#" onclick="syncDias('7');buscarProducto('${prodSafe}');return false" style="color:#3ddc6e">7 días</a></small>`
       }</div>`;
   }
 }
