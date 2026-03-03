@@ -71,19 +71,21 @@
       z-index: 1;
       max-width: 1280px;
       margin: 0 auto;
-      padding: 0 24px 60px;
+      padding: 0 16px 80px;
     }
+    @media (min-width: 640px) { .layout { padding: 0 24px 60px; } }
 
     /* ── HEADER ── */
     header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 28px 0 24px;
+      padding: 18px 0 16px;
       border-bottom: 1px solid var(--border);
       flex-wrap: wrap;
-      gap: 12px;
+      gap: 10px;
     }
+    @media (min-width: 640px) { header { padding: 28px 0 24px; } }
 
     .brand {
       display: flex;
@@ -107,10 +109,11 @@
     .brand-title {
       font-family: var(--font-display);
       font-weight: 700;
-      font-size: 20px;
+      font-size: 16px;
       letter-spacing: -0.3px;
       color: var(--text);
     }
+    @media (min-width: 480px) { .brand-title { font-size: 20px; } }
 
     .brand-sub {
       font-size: 11px;
@@ -121,8 +124,12 @@
     .header-meta {
       display: flex;
       align-items: center;
-      gap: 20px;
+      gap: 10px;
+      flex-wrap: wrap;
     }
+    @media (min-width: 480px) { .header-meta { gap: 20px; } }
+    #last-update { display: none; }
+    @media (min-width: 640px) { #last-update { display: inline; } }
 
     .status-dot {
       width: 8px; height: 8px;
@@ -144,12 +151,22 @@
 
     /* ── CONTROLS ── */
     .controls {
-      display: flex;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      padding: 16px 0 0;
       align-items: center;
-      gap: 12px;
-      padding: 20px 0 0;
-      flex-wrap: wrap;
     }
+    @media (min-width: 640px) {
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 20px 0 0;
+      }
+    }
+    .label { display: none; }
+    @media (min-width: 640px) { .label { display: inline; } }
 
     .label {
       font-size: 11px;
@@ -169,18 +186,146 @@
       outline: none;
       cursor: pointer;
       transition: border-color 0.15s;
-      min-width: 180px;
+      width: 100%;
+    }
+    @media (min-width: 640px) {
+      select, input[type="text"] { width: auto; min-width: 180px; }
     }
 
     select:focus, input[type="text"]:focus {
       border-color: var(--green);
     }
 
+    /* ── CUSTOM DROPDOWN ── */
+    .dropdown-wrap {
+      position: relative;
+      min-width: 0;
+      width: 100%;
+      grid-column: 1 / -1;
+    }
+    @media (min-width: 640px) { .dropdown-wrap { width: auto; min-width: 260px; grid-column: auto; } }
+
+    .dropdown-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      padding: 8px 12px 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      user-select: none;
+      gap: 8px;
+    }
+
+    .dropdown-trigger:hover,
+    .dropdown-trigger.open { border-color: var(--green); }
+
+    .dropdown-trigger-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .dropdown-trigger-text.placeholder { color: var(--muted); }
+
+    .dropdown-arrow {
+      flex-shrink: 0;
+      width: 14px; height: 14px;
+      color: var(--muted);
+      transition: transform 0.2s;
+    }
+
+    .dropdown-trigger.open .dropdown-arrow { transform: rotate(180deg); }
+
+    .dropdown-panel {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0; right: 0;
+      background: var(--card);
+      border: 1px solid var(--green);
+      border-radius: 8px;
+      z-index: 200;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      overflow: hidden;
+      display: none;
+      min-width: 260px;
+    }
+
+    .dropdown-panel.open { display: block; animation: fadeIn 0.15s ease; }
+
+    .dropdown-search {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .dropdown-search input {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      outline: none;
+      width: 100%;
+      padding: 0;
+      min-width: 0;
+    }
+
+    .dropdown-search input::placeholder { color: var(--muted); }
+
+    .dropdown-search-icon { color: var(--muted); flex-shrink: 0; }
+
+    .dropdown-options {
+      max-height: 260px;
+      overflow-y: auto;
+    }
+
+    .dropdown-options::-webkit-scrollbar { width: 4px; }
+    .dropdown-options::-webkit-scrollbar-track { background: transparent; }
+    .dropdown-options::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .dropdown-option {
+      padding: 9px 14px;
+      font-size: 12px;
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.1s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .dropdown-option:hover   { background: rgba(61,220,110,0.07); }
+    .dropdown-option.selected { background: rgba(61,220,110,0.14); color: var(--green); }
+
+    .dropdown-empty {
+      padding: 14px;
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .dropdown-count {
+      font-size: 10px;
+      color: var(--muted);
+      padding: 6px 14px;
+      border-top: 1px solid var(--border);
+      text-align: right;
+    }
+
     .btn {
       background: var(--green);
       color: var(--bg);
       border: none;
-      padding: 8px 18px;
+      padding: 9px 18px;
       border-radius: 6px;
       font-family: var(--font-display);
       font-weight: 700;
@@ -188,7 +333,10 @@
       cursor: pointer;
       transition: opacity 0.15s, transform 0.1s;
       letter-spacing: 0.02em;
+      width: 100%;
+      text-align: center;
     }
+    @media (min-width: 640px) { .btn { width: auto; } }
 
     .btn:hover  { opacity: 0.85; }
     .btn:active { transform: scale(0.97); }
@@ -204,20 +352,23 @@
     /* ── KPI CARDS ── */
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 12px;
-      margin: 24px 0;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin: 16px 0;
     }
+    @media (min-width: 480px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (min-width: 900px) { .kpi-grid { grid-template-columns: repeat(6, 1fr); margin: 24px 0; gap: 12px; } }
 
     .kpi {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 10px;
-      padding: 18px 20px;
+      padding: 14px 14px;
       position: relative;
       overflow: hidden;
       transition: border-color 0.2s;
     }
+    @media (min-width: 640px) { .kpi { padding: 18px 20px; } }
 
     .kpi::before {
       content: '';
@@ -240,10 +391,11 @@
     .kpi-value {
       font-family: var(--font-display);
       font-weight: 800;
-      font-size: 26px;
+      font-size: 20px;
       color: var(--text);
       line-height: 1;
     }
+    @media (min-width: 640px) { .kpi-value { font-size: 26px; } }
 
     .kpi-value.green  { color: var(--green); }
     .kpi-value.amber  { color: var(--amber); }
@@ -258,13 +410,12 @@
     /* ── GRID DE SECCIONES ── */
     .main-grid {
       display: grid;
-      grid-template-columns: 1fr 360px;
-      gap: 16px;
+      grid-template-columns: 1fr;
+      gap: 14px;
       align-items: start;
     }
-
-    @media (max-width: 900px) {
-      .main-grid { grid-template-columns: 1fr; }
+    @media (min-width: 1024px) {
+      .main-grid { grid-template-columns: 1fr 340px; gap: 16px; }
     }
 
     /* ── PANEL GENÉRICO ── */
@@ -279,9 +430,12 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 16px 20px;
+      padding: 13px 16px;
       border-bottom: 1px solid var(--border);
+      gap: 8px;
+      flex-wrap: wrap;
     }
+    @media (min-width: 480px) { .panel-header { padding: 16px 20px; } }
 
     .panel-title {
       font-family: var(--font-display);
@@ -291,14 +445,17 @@
     }
 
     .panel-body {
-      padding: 20px;
+      padding: 14px;
     }
+    @media (min-width: 480px) { .panel-body { padding: 20px; } }
 
     /* ── CHART CONTAINER ── */
     .chart-wrap {
       position: relative;
-      height: 300px;
+      height: 240px;
     }
+    @media (min-width: 480px) { .chart-wrap { height: 280px; } }
+    @media (min-width: 768px) { .chart-wrap { height: 300px; } }
 
     /* ── TABLA DE PRECIOS ── */
     .price-table-wrap {
@@ -316,9 +473,10 @@
       text-transform: uppercase;
       letter-spacing: 0.08em;
       text-align: right;
-      padding: 8px 10px;
+      padding: 8px 8px;
       border-bottom: 1px solid var(--border);
       font-weight: 400;
+      white-space: nowrap;
     }
 
     thead th:first-child { text-align: left; }
@@ -330,11 +488,17 @@
     tbody tr:hover { background: rgba(61, 220, 110, 0.04); }
 
     tbody td {
-      padding: 9px 10px;
-      font-size: 12px;
+      padding: 8px 8px;
+      font-size: 11px;
       text-align: right;
       border-bottom: 1px solid rgba(30, 48, 34, 0.5);
       color: var(--muted);
+      white-space: nowrap;
+    }
+    @media (min-width: 480px) { tbody td, thead th { font-size: 12px; padding: 9px 10px; } }
+    /* hide moda on very small screens */
+    @media (max-width: 420px) {
+      .col-moda { display: none; }
     }
 
     tbody td:first-child {
@@ -352,15 +516,16 @@
 
     /* ── MINI SPARKLINE PROJECTION ── */
     .projection-panel {
-      margin-top: 16px;
+      margin-top: 0;
     }
 
     .proj-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      gap: 8px;
       margin-top: 12px;
     }
+    @media (max-width: 380px) { .proj-grid { grid-template-columns: 1fr; } }
 
     .proj-item {
       background: var(--surface);
@@ -388,9 +553,10 @@
       display: flex;
       flex-direction: column;
       gap: 2px;
-      max-height: 420px;
+      max-height: 280px;
       overflow-y: auto;
     }
+    @media (min-width: 1024px) { .product-list { max-height: 420px; } }
 
     .product-list::-webkit-scrollbar { width: 4px; }
     .product-list::-webkit-scrollbar-track { background: transparent; }
@@ -463,11 +629,11 @@
     /* ── FOOTER ── */
     footer {
       text-align: center;
-      padding: 32px 0 0;
+      padding: 24px 0 env(safe-area-inset-bottom, 0);
       color: var(--muted);
       font-size: 11px;
       border-top: 1px solid var(--border);
-      margin-top: 40px;
+      margin-top: 32px;
     }
 
     footer a { color: var(--green); text-decoration: none; }
@@ -488,6 +654,60 @@
       padding: 16px 20px;
       color: var(--red);
       font-size: 12px;
+    }
+
+    /* ── MOBILE STICKY BOTTOM BAR ── */
+    .mobile-bottom-bar {
+      display: none;
+    }
+    @media (max-width: 639px) {
+      .mobile-bottom-bar {
+        display: flex;
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0));
+        gap: 10px;
+        z-index: 150;
+        align-items: center;
+      }
+      .mobile-bottom-bar select {
+        flex: 1;
+        font-size: 13px;
+        padding: 10px 12px;
+      }
+      .mobile-bottom-bar .btn-reset-mobile {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        padding: 10px 16px;
+        border-radius: 6px;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 13px;
+        cursor: pointer;
+        white-space: nowrap;
+        flex-shrink: 0;
+        transition: border-color 0.15s, color 0.15s;
+      }
+      .mobile-bottom-bar .btn-reset-mobile:hover { border-color: var(--green); color: var(--green); }
+      /* Hide the regular period + limpiar from controls on mobile */
+      .controls .hide-mobile { display: none; }
+    }
+
+    /* ── TOUCH TARGET IMPROVEMENTS ── */
+    @media (max-width: 639px) {
+      .dropdown-trigger { padding: 11px 12px 11px 14px; min-height: 44px; }
+      .dropdown-option  { padding: 12px 14px; min-height: 44px; display: flex; align-items: center; }
+      .prod-item        { padding: 11px 12px; min-height: 44px; }
+      .dropdown-options { max-height: 52vh; }
+    }
+
+    /* ── PANEL TITLE TRUNCATE ON MOBILE ── */
+    @media (max-width: 480px) {
+      .panel-title { font-size: 13px; }
+      #chart-title { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
     }
   </style>
 </head>
@@ -513,19 +733,38 @@
   <!-- ── CONTROLS ── -->
   <div class="controls">
     <span class="label">Producto</span>
-    <input type="text" id="prod-input" placeholder="Ej: tomate, papa, cebolla…" list="prod-list" />
-    <datalist id="prod-list"></datalist>
 
-    <span class="label">Período</span>
-    <select id="dias-select">
+    <!-- Custom searchable dropdown -->
+    <div class="dropdown-wrap" id="dropdown-wrap">
+      <div class="dropdown-trigger" id="dropdown-trigger">
+        <span class="dropdown-trigger-text placeholder" id="dropdown-trigger-text">Cargando productos…</span>
+        <svg class="dropdown-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="4 6 8 10 12 6"/>
+        </svg>
+      </div>
+      <div class="dropdown-panel" id="dropdown-panel">
+        <div class="dropdown-search">
+          <svg class="dropdown-search-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="6.5" cy="6.5" r="4.5"/><line x1="10" y1="10" x2="14" y2="14"/>
+          </svg>
+          <input type="text" id="dropdown-search" placeholder="Buscar producto…" autocomplete="off" />
+        </div>
+        <div class="dropdown-options" id="dropdown-options">
+          <div class="dropdown-empty">Cargando…</div>
+        </div>
+        <div class="dropdown-count" id="dropdown-count"></div>
+      </div>
+    </div>
+
+    <span class="label hide-mobile">Período</span>
+    <select id="dias-select" class="hide-mobile">
       <option value="15">15 días</option>
       <option value="30" selected>30 días</option>
       <option value="60">60 días</option>
       <option value="90">90 días</option>
     </select>
 
-    <button class="btn" id="btn-buscar">Analizar</button>
-    <button class="btn btn-ghost" id="btn-reset">Limpiar</button>
+    <button class="btn btn-ghost hide-mobile" id="btn-reset">Limpiar</button>
   </div>
 
   <!-- ── KPIs ── -->
@@ -586,7 +825,7 @@
                   <th>Fecha</th>
                   <th>Mínimo</th>
                   <th>Máximo</th>
-                  <th>Moda</th>
+                  <th class="col-moda">Moda</th>
                   <th>Promedio</th>
                   <th>Var.</th>
                 </tr>
@@ -636,18 +875,31 @@
     &nbsp;·&nbsp; Dashboard generado automáticamente
   </footer>
 
+
+  <!-- ── MOBILE STICKY BOTTOM BAR ── -->
+  <div class="mobile-bottom-bar">
+    <select id="dias-select-mobile">
+      <option value="15">15 días</option>
+      <option value="30" selected>30 días</option>
+      <option value="60">60 días</option>
+      <option value="90">90 días</option>
+    </select>
+    <button class="btn-reset-mobile" id="btn-reset-mobile">Limpiar</button>
+  </div>
 </div><!-- /layout -->
 
 <script>
 // ─────────────────────────────────────────────
-//  CONFIG — ajusta la URL cuando tu API esté live
+//  CONFIG
 // ─────────────────────────────────────────────
-const API_BASE = "https://pima-api.onrender.com";
+const API_BASE = "https://pima-api-6bys.onrender.com";
 // Para desarrollo local usa: const API_BASE = "http://localhost:8000";
 
-let priceChart  = null;
-let projChart   = null;
+let priceChart   = null;
+let projChart    = null;
 let currentSerie = null;
+let allProducts  = [];
+let selectedProduct = null;
 
 // ─────────────────────────────────────────────
 //  UTILS
@@ -671,11 +923,98 @@ function setStatus(ok, text) {
 }
 
 // ─────────────────────────────────────────────
+//  CUSTOM DROPDOWN
+// ─────────────────────────────────────────────
+const ddTrigger = document.getElementById("dropdown-trigger");
+const ddPanel   = document.getElementById("dropdown-panel");
+const ddSearch  = document.getElementById("dropdown-search");
+const ddOptions = document.getElementById("dropdown-options");
+const ddCount   = document.getElementById("dropdown-count");
+const ddText    = document.getElementById("dropdown-trigger-text");
+
+function openDropdown() {
+  ddTrigger.classList.add("open");
+  ddPanel.classList.add("open");
+  ddSearch.value = "";
+  renderDropdownOptions(allProducts);
+  setTimeout(() => ddSearch.focus(), 50);
+}
+
+function closeDropdown() {
+  ddTrigger.classList.remove("open");
+  ddPanel.classList.remove("open");
+}
+
+function renderDropdownOptions(list) {
+  if (list.length === 0) {
+    ddOptions.innerHTML = `<div class="dropdown-empty">Sin resultados</div>`;
+    ddCount.textContent = "";
+    return;
+  }
+  ddOptions.innerHTML = list.map(p => `
+    <div class="dropdown-option${p === selectedProduct ? " selected" : ""}"
+         data-value="${p.replace(/"/g,'&quot;')}">${p}</div>`).join("");
+  ddCount.textContent = `${list.length} productos`;
+
+  ddOptions.querySelectorAll(".dropdown-option").forEach(el => {
+    el.addEventListener("click", () => {
+      selectProduct(el.dataset.value);
+      closeDropdown();
+    });
+  });
+}
+
+function populateDropdown(productos) {
+  allProducts = productos;
+  ddText.textContent = "Seleccione un producto";
+  ddText.classList.remove("placeholder");
+  ddText.classList.add("placeholder");
+  ddTrigger.style.pointerEvents = "";
+  renderDropdownOptions(productos);
+}
+
+function selectProduct(nombre) {
+  selectedProduct = nombre;
+  ddText.textContent = nombre;
+  ddText.classList.remove("placeholder");
+  // Highlight in sidebar list
+  document.querySelectorAll(".prod-item").forEach(el => {
+    el.classList.toggle("active", el.dataset.prod === nombre);
+  });
+  buscarProducto(nombre);
+}
+
+// Toggle dropdown on trigger click
+ddTrigger.addEventListener("click", () => {
+  ddPanel.classList.contains("open") ? closeDropdown() : openDropdown();
+});
+
+// Filter options on search
+ddSearch.addEventListener("input", () => {
+  const q = ddSearch.value.toLowerCase().trim();
+  const filtered = q ? allProducts.filter(p => p.toLowerCase().includes(q)) : allProducts;
+  renderDropdownOptions(filtered);
+});
+
+// Close on outside click
+document.addEventListener("click", e => {
+  if (!document.getElementById("dropdown-wrap").contains(e.target)) closeDropdown();
+});
+
+// Keyboard navigation
+ddSearch.addEventListener("keydown", e => {
+  if (e.key === "Escape") closeDropdown();
+  if (e.key === "Enter") {
+    const first = ddOptions.querySelector(".dropdown-option");
+    if (first) { selectProduct(first.dataset.value); closeDropdown(); }
+  }
+});
+
+// ─────────────────────────────────────────────
 //  CARGA INICIAL: productos + resumen
 // ─────────────────────────────────────────────
 async function initDashboard() {
   try {
-    // Health check
     await apiFetch("/health");
     setStatus(true, "API conectada");
   } catch {
@@ -691,19 +1030,12 @@ async function initDashboard() {
     document.getElementById("kpi-fecha").textContent = fmtDate(data.fecha_boletin);
     document.getElementById("last-update").textContent = `Actualizado ${fmtDate(data.fecha_boletin)}`;
 
-    // Datalist para autocomplete
-    const dl = document.getElementById("prod-list");
-    data.productos.forEach(p => {
-      const opt = document.createElement("option");
-      opt.value = p;
-      dl.appendChild(opt);
-    });
-
-    // Render product list
+    populateDropdown(data.productos);
     renderProductList(data.productos, null);
     document.getElementById("prod-loader").style.display = "none";
   } catch(e) {
     document.getElementById("prod-loader").innerHTML = `<span style="color:var(--red)">Error cargando productos</span>`;
+    ddText.textContent = "Error al cargar";
   }
 
   try {
@@ -715,14 +1047,12 @@ async function initDashboard() {
 function renderProductList(productos, activo) {
   const ul = document.getElementById("prod-list-ui");
   ul.innerHTML = "";
-  productos.slice(0, 60).forEach(p => {
+  productos.slice(0, 80).forEach(p => {
     const div = document.createElement("div");
     div.className = "prod-item" + (p === activo ? " active" : "");
+    div.dataset.prod = p;
     div.innerHTML = `<span class="prod-name">${p}</span>`;
-    div.addEventListener("click", () => {
-      document.getElementById("prod-input").value = p;
-      buscarProducto(p);
-    });
+    div.addEventListener("click", () => selectProduct(p));
     ul.appendChild(div);
   });
 }
@@ -749,7 +1079,7 @@ function renderTopPanel(resumen) {
 // ─────────────────────────────────────────────
 async function buscarProducto(prod) {
   if (!prod.trim()) return;
-  const dias = document.getElementById("dias-select").value;
+  const dias = getDias();
 
   document.getElementById("chart-loader").style.display = "flex";
   document.getElementById("chart-loader").innerHTML = `<div class="spinner"></div><span>Cargando serie de ${prod}…</span>`;
@@ -1039,7 +1369,7 @@ function renderTable(serie) {
         <td>${fmtDate(row.fecha)}</td>
         <td>${fmt(row.minimo)}</td>
         <td>${fmt(row.maximo)}</td>
-        <td>${fmt(row.moda)}</td>
+        <td class="col-moda">${fmt(row.moda)}</td>
         <td style="color:var(--text)">${fmt(row.promedio)}</td>
         <td>${varBadge}</td>
       </tr>`;
@@ -1056,12 +1386,15 @@ function loadDemoData() {
   document.getElementById("prod-loader").style.display = "none";
 
   const demoProducts = ["Tomate", "Papa", "Cebolla", "Zanahoria", "Lechuga", "Aguacate", "Plátano", "Chayote"];
+  populateDropdown(demoProducts);
+
   const ul = document.getElementById("prod-list-ui");
   demoProducts.forEach(p => {
     const div = document.createElement("div");
     div.className = "prod-item";
+    div.dataset.prod = p;
     div.innerHTML = `<span class="prod-name">${p}</span><span class="prod-price">Demo</span>`;
-    div.addEventListener("click", () => loadDemoSerie(p));
+    div.addEventListener("click", () => { selectProduct(p); loadDemoSerie(p); });
     ul.appendChild(div);
   });
 
@@ -1093,16 +1426,12 @@ function loadDemoSerie(nombre) {
 // ─────────────────────────────────────────────
 //  EVENT LISTENERS
 // ─────────────────────────────────────────────
-document.getElementById("btn-buscar").addEventListener("click", () => {
-  buscarProducto(document.getElementById("prod-input").value);
-});
-
-document.getElementById("prod-input").addEventListener("keydown", e => {
-  if (e.key === "Enter") buscarProducto(e.target.value);
-});
-
 document.getElementById("btn-reset").addEventListener("click", () => {
-  document.getElementById("prod-input").value = "";
+  selectedProduct = null;
+  ddText.textContent = "Seleccione un producto";
+  ddText.classList.add("placeholder");
+  document.querySelectorAll(".prod-item").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".dropdown-option").forEach(el => el.classList.remove("selected"));
   if (priceChart) priceChart.destroy();
   if (projChart) projChart.destroy();
   document.getElementById("chart-wrap").style.display = "none";
@@ -1116,6 +1445,37 @@ document.getElementById("btn-reset").addEventListener("click", () => {
     document.getElementById(id).textContent = "—";
     document.getElementById(id).className = "kpi-value";
   });
+  document.getElementById("kpi-unidad").textContent = "";
+});
+
+// Sync both period selects and auto-reload
+function getDias() {
+  return document.getElementById("dias-select").value;
+}
+
+function syncDias(val) {
+  document.getElementById("dias-select").value = val;
+  const mob = document.getElementById("dias-select-mobile");
+  if (mob) mob.value = val;
+}
+
+document.getElementById("dias-select").addEventListener("change", e => {
+  syncDias(e.target.value);
+  if (selectedProduct) buscarProducto(selectedProduct);
+});
+
+const mobSelect = document.getElementById("dias-select-mobile");
+if (mobSelect) {
+  mobSelect.addEventListener("change", e => {
+    syncDias(e.target.value);
+    if (selectedProduct) buscarProducto(selectedProduct);
+  });
+}
+
+// Mobile reset button
+const mobReset = document.getElementById("btn-reset-mobile");
+if (mobReset) mobReset.addEventListener("click", () => {
+  document.getElementById("btn-reset").click();
 });
 
 // ─────────────────────────────────────────────
