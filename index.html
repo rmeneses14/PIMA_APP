@@ -1135,40 +1135,36 @@ async function buscarProducto(prod) {
   document.getElementById("proj-panel").style.display = "none";
   document.getElementById("table-panel").style.display = "none";
 
-  // Intentar API con timeout de 12s; si falla usar datos locales
-  let data = null;
-  try {
-    const controller = new AbortController();
-    const tid = setTimeout(() => controller.abort(), 12000);
-    const r = await fetch(`${API_BASE}/precios/${encodeURIComponent(prod)}?dias=${dias}`, { signal: controller.signal });
-    clearTimeout(tid);
-    if (r.ok) data = await r.json();
-  } catch(e) { /* silencioso — usamos fallback local */ }
-
-  // Fallback local si API no respondió o devolvió vacío
-  if (!data || !data.serie || data.serie.length === 0) {
-    data = localGetPrecios(prod, dias);
-  }
-
-  // Si local tampoco tiene datos con ese período, ampliar automáticamente
-  if (!data || data.serie.length === 0) {
-    data = localGetPrecios(prod, 90); // todo lo disponible
-  }
+  // 1. Mostrar datos locales INMEDIATAMENTE (sin esperar API)
+  let data = localGetPrecios(prod, dias) || localGetPrecios(prod, 90);
 
   if (!data || data.serie.length === 0) {
-    const prodSafe = prod.replace(/'/g, "\\'");
     document.getElementById("chart-loader").innerHTML =
-      `<div class="error-box">Sin datos de "<strong>${prod}</strong>" disponibles.</div>`;
+      `<div class="error-box">Sin datos de "<strong>${prod}</strong>" en el seed local.</div>`;
     return;
   }
 
-  // Mostrar aviso si se usaron datos locales
-  if (data._fuente === "local") {
-    setStatus(false, `Datos locales · ${data.serie.length} registros`);
-  }
-
+  // Renderizar con datos locales de inmediato
+  setStatus(false, `Datos locales · ${data.serie.length} registros`);
   currentSerie = data;
   renderSerie(data);
+
+  // 2. Intentar API en background con timeout corto (5s)
+  //    Si responde con datos frescos, actualizar silenciosamente
+  try {
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 5000);
+    const r = await fetch(`${API_BASE}/precios/${encodeURIComponent(prod)}?dias=${dias}`, { signal: controller.signal });
+    clearTimeout(tid);
+    if (r.ok) {
+      const apiData = await r.json();
+      if (apiData?.serie?.length > 0) {
+        currentSerie = apiData;
+        renderSerie(apiData);
+        setStatus(true, `Datos en vivo · ${apiData.serie.length} registros`);
+      }
+    }
+  } catch(e) { /* API no disponible — datos locales ya se muestran */ }
 }
 
 function renderSerie(data) {
@@ -1196,7 +1192,9 @@ function renderSerie(data) {
 
   // Trend badge
   const trendWrap = document.getElementById("trend-badge-wrap");
-  const slope = linearSlope(proms);
+  const slope = proms.length >= 2
+    ? (proms.at(-1) - proms[0]) / Math.max(proms.length - 1, 1)
+    : 0;
   let badgeHtml = "";
   if (slope > 0.01)       badgeHtml = `<span class="trend-badge trend-up">▲ Tendencia alcista</span>`;
   else if (slope < -0.01) badgeHtml = `<span class="trend-badge trend-down">▼ Tendencia bajista</span>`;
