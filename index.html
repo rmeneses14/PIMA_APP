@@ -1403,23 +1403,31 @@ function tradeSignal(lastPrice, forecast5, reversionZ, bands) {
     // Incertidumbre muy alta → prudencia
     signal = "Señal indefinida";
     color  = "rgba(240,180,41,0.15)";
-    icon   = "◈";
+    icon   = "◈ INCIERTO";
     reason = `Banda de incertidumbre ±${(bandWidth/2).toFixed(0)}% — se necesitan más días de datos para señal clara.`;
-  } else if (pctChange < -5 && reversionZ <= 0) {
-    signal = "Comprar ahora";
-    color  = "rgba(61,220,110,0.12)";
-    icon   = "▼ COMPRAR";
-    reason = `Se proyecta baja del ${Math.abs(pctChange).toFixed(1)}% en 5 días. ${reversionZ < -1.5 ? "Precio actualmente bajo su media histórica — posible rebote." : "Tendencia bajista sostenida."}`;
+  } else if (pctChange < -5) {
+    // Precio va a bajar → esperar para comprar más barato
+    signal = "Esperar — precio bajará";
+    color  = "rgba(100,149,237,0.12)";
+    icon   = "▼ ESPERAR";
+    reason = `Se proyecta baja del ${Math.abs(pctChange).toFixed(1)}% en 5 días — conviene esperar para comprar más barato.`;
   } else if (pctChange > 5 || reversionZ > 1.5) {
-    signal = "Esperar / precio alto";
+    // Precio va a subir o está muy alto → comprar ahora antes de que suba más
+    signal = "Comprar ahora — precio subirá";
     color  = "rgba(232,93,93,0.12)";
-    icon   = "▲ ESPERAR";
-    reason = `${reversionZ > 1.5 ? `Precio ${((lastPrice / (reversionZ > 0 ? 1 : -1) + 1)).toFixed(0)}% sobre media histórica — reversión probable.` : `Se proyecta alza del ${pctChange.toFixed(1)}% — posible mejora comprando antes.`}`;
+    icon   = "▲ COMPRAR YA";
+    reason = `${reversionZ > 1.5 ? `Precio sobre su media histórica pero con tendencia alcista (+${pctChange.toFixed(1)}%) — comprar antes de que suba más.` : `Se proyecta alza del ${pctChange.toFixed(1)}% en 5 días — conviene comprar ahora.`}`;
+  } else if (pctChange < -2) {
+    // Baja leve → ligera ventaja en esperar
+    signal = "Leve tendencia bajista";
+    color  = "rgba(100,149,237,0.08)";
+    icon   = "↓ CONSIDERAR ESPERAR";
+    reason = `Baja leve proyectada del ${Math.abs(pctChange).toFixed(1)}% — podría convenir esperar, pero la diferencia es pequeña.`;
   } else {
     signal = "Precio estable";
-    color  = "rgba(100,149,237,0.12)";
-    icon   = "→ ESTABLE";
-    reason = `Variación proyectada de ${pctChange > 0 ? "+" : ""}${pctChange.toFixed(1)}% en 5 días. Sin ventaja clara de esperar.`;
+    color  = "rgba(61,220,110,0.08)";
+    icon   = "→ COMPRAR NORMAL";
+    reason = `Precio estable, variación proyectada de ${pctChange > 0 ? "+" : ""}${pctChange.toFixed(1)}% en 5 días. Sin ventaja clara de esperar.`;
   }
 
   return { signal, color, icon, reason };
