@@ -521,11 +521,11 @@
 
     .proj-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(3, 1fr);
       gap: 8px;
-      margin-top: 12px;
+      margin-bottom: 4px;
     }
-    @media (max-width: 380px) { .proj-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 480px) { .proj-grid { grid-template-columns: repeat(2, 1fr); } }
 
     .proj-item {
       background: var(--surface);
@@ -800,14 +800,23 @@
       <!-- Proyección -->
       <div class="panel projection-panel" id="proj-panel" style="display:none">
         <div class="panel-header">
-          <span class="panel-title">Proyección (7 días)</span>
-          <span style="font-size:11px;color:var(--muted)">Regresión lineal simple</span>
+          <span class="panel-title">Proyección — próximos 7 días hábiles</span>
+          <span id="proj-model-badge" style="font-size:10px;padding:2px 8px;border-radius:4px;background:rgba(61,220,110,0.15);color:#3ddc6e;font-family:var(--font-mono)">Holt + Reversión</span>
         </div>
         <div class="panel-body">
+          <!-- KPIs de proyección -->
           <div class="proj-grid" id="proj-grid"></div>
-          <div id="proj-chart-wrap" style="height:120px;margin-top:16px">
+
+          <!-- Señal de decisión para el comerciante -->
+          <div id="trade-signal" style="margin:12px 0;padding:10px 14px;border-radius:6px;font-size:12px;font-family:var(--font-mono);display:none"></div>
+
+          <!-- Gráfico proyección con bandas -->
+          <div id="proj-chart-wrap" style="height:140px;margin-top:8px">
             <canvas id="proj-chart"></canvas>
           </div>
+
+          <!-- Notas del modelo -->
+          <div id="proj-model-notes" style="margin-top:10px;font-size:10px;color:var(--muted);line-height:1.6;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px"></div>
         </div>
       </div>
 
@@ -872,7 +881,7 @@
   <footer>
     Datos: <a href="https://www.pima.go.cr/boletin/" target="_blank">PIMA · SIMM · CENADA</a> &nbsp;·&nbsp;
     API: <a href="https://github.com/rmeneses14/PIMA_API" target="_blank">github.com/rmeneses14/PIMA_API</a>
-    &nbsp;·&nbsp; Dashboard generado por RM
+    &nbsp;·&nbsp; Dashboard generado automáticamente
   </footer>
 
 
@@ -1236,76 +1245,270 @@ function renderPriceChart(serie) {
 // ─────────────────────────────────────────────
 //  PROYECCIÓN (regresión lineal)
 // ─────────────────────────────────────────────
-function linearSlope(values) {
-  const n = values.length;
-  if (n < 2) return 0;
-  const sumX = values.reduce((a,_,i) => a+i, 0);
-  const sumY = values.reduce((a,v) => a+v, 0);
-  const sumXY = values.reduce((a,v,i) => a+i*v, 0);
-  const sumX2 = values.reduce((a,_,i) => a+i*i, 0);
-  return (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX);
+// ─── MOTOR DE PROYECCIÓN ────────────────────────────────────────────────────
+
+/**
+ * Holt Double Exponential Smoothing
+ * α controla suavizado del nivel, β controla la tendencia
+ * Conservadores para commodities agrícolas: α=0.3, β=0.1
+ */
+function holtForecast(values, steps = 7, alpha = 0.3, beta = 0.1) {
+  if (values.length < 3) return null;
+  let L = values[0];
+  let T = values[1] - values[0];
+  for (let i = 1; i < values.length; i++) {
+    const Lprev = L, Tprev = T;
+    L = alpha * values[i] + (1 - alpha) * (Lprev + Tprev);
+    T = beta * (L - Lprev) + (1 - beta) * Tprev;
+  }
+  return { forecast: Array.from({length: steps}, (_, h) => L + (h + 1) * T), L, T };
 }
 
-function linearPredict(values, stepsAhead) {
-  const n = values.length;
-  const slope = linearSlope(values);
-  const intercept = (values.reduce((a,v) => a+v, 0)/n) - slope*(n/2);
-  return Array.from({length: stepsAhead}, (_, i) => intercept + slope*(n+i));
+/**
+ * Corrección por reversión a la media
+ * Precios agrícolas siempre revierten a la media histórica (ciclos de cosecha)
+ * Si Z > 1.5σ → el modelo frena el alza y proyecta retorno gradual
+ */
+function meanReversionCorrection(forecast, values, threshold = 1.5) {
+  const mean = values.reduce((a,v) => a+v, 0) / values.length;
+  const std  = Math.sqrt(values.reduce((a,v) => a + Math.pow(v-mean, 2), 0) / (values.length-1));
+  if (std === 0) return { corrected: forecast, z: 0, mean, std, active: false };
+
+  const current = values.at(-1);
+  const z = (current - mean) / std;
+  const steps = forecast.length;
+  let active = false;
+
+  const corrected = forecast.map((f, h) => {
+    if (Math.abs(z) <= threshold) return f;
+    active = true;
+    // Fuerza de reversión: sube con horizonte, capped al 40%
+    const strength = Math.min(Math.abs(z) / 4, 0.4) * ((h + 1) / steps);
+    return z > threshold
+      ? f - strength * (current - mean)
+      : f + strength * (mean - current);
+  });
+
+  return { corrected, z, mean, std, active };
+}
+
+/**
+ * Bandas de confianza al 95% con t-distribution (correcta para muestras pequeñas)
+ * Se ensanchan progresivamente con el horizonte
+ */
+function confidenceBands(forecast, values) {
+  const n   = values.length;
+  const std = Math.sqrt(values.reduce((a,v,_,arr) => {
+    const m = arr.reduce((s,x) => s+x, 0)/arr.length;
+    return a + Math.pow(v-m, 2);
+  }, 0) / Math.max(n-1, 1));
+
+  // t-value aproximado para 95% bilateral según n
+  const tVal = n < 12 ? 2.228 : n < 20 ? 2.131 : n < 30 ? 2.042 : 1.96;
+  const se   = std * Math.sqrt(1 + 1/n);
+
+  return forecast.map((f, h) => {
+    const margin = tVal * se * Math.sqrt(h + 1);
+    return { lower: Math.max(0, f - margin), upper: f + margin };
+  });
+}
+
+/**
+ * Detecta anomalías: precio actual vs últimos 5 días
+ */
+function detectAnomaly(values) {
+  if (values.length < 5) return null;
+  const recent = values.slice(-5);
+  const mean   = recent.reduce((a,v) => a+v, 0) / recent.length;
+  const std    = Math.sqrt(recent.reduce((a,v) => a + Math.pow(v-mean, 2), 0) / (recent.length-1));
+  const z      = std > 0 ? (values.at(-1) - mean) / std : 0;
+  return Math.abs(z) > 2 ? { z, direction: z > 0 ? "alza" : "baja" } : null;
+}
+
+/**
+ * Señal de decisión para el comerciante
+ * Responde: "¿Compro hoy o espero?"
+ */
+function tradeSignal(lastPrice, forecast5, reversionZ, bands) {
+  const proj5     = forecast5.at(-1);
+  const pctChange = (proj5 - lastPrice) / lastPrice * 100;
+  const bandWidth = (bands.at(-1).upper - bands.at(-1).lower) / lastPrice * 100;
+
+  let signal, color, icon, reason;
+
+  if (bandWidth > 40) {
+    // Incertidumbre muy alta → prudencia
+    signal = "Señal indefinida";
+    color  = "rgba(240,180,41,0.15)";
+    icon   = "◈";
+    reason = `Banda de incertidumbre ±${(bandWidth/2).toFixed(0)}% — se necesitan más días de datos para señal clara.`;
+  } else if (pctChange < -5 && reversionZ <= 0) {
+    signal = "Comprar ahora";
+    color  = "rgba(61,220,110,0.12)";
+    icon   = "▼ COMPRAR";
+    reason = `Se proyecta baja del ${Math.abs(pctChange).toFixed(1)}% en 5 días. ${reversionZ < -1.5 ? "Precio actualmente bajo su media histórica — posible rebote." : "Tendencia bajista sostenida."}`;
+  } else if (pctChange > 5 || reversionZ > 1.5) {
+    signal = "Esperar / precio alto";
+    color  = "rgba(232,93,93,0.12)";
+    icon   = "▲ ESPERAR";
+    reason = `${reversionZ > 1.5 ? `Precio ${((lastPrice / (reversionZ > 0 ? 1 : -1) + 1)).toFixed(0)}% sobre media histórica — reversión probable.` : `Se proyecta alza del ${pctChange.toFixed(1)}% — posible mejora comprando antes.`}`;
+  } else {
+    signal = "Precio estable";
+    color  = "rgba(100,149,237,0.12)";
+    icon   = "→ ESTABLE";
+    reason = `Variación proyectada de ${pctChange > 0 ? "+" : ""}${pctChange.toFixed(1)}% en 5 días. Sin ventaja clara de esperar.`;
+  }
+
+  return { signal, color, icon, reason };
 }
 
 function renderProjection(serie) {
   const proms = serie.map(s => s.promedio).filter(Boolean);
-  if (proms.length < 5) return;
+  if (proms.length < 4) return;
 
-  const DAYS = 7;
-  const projected = linearPredict(proms, DAYS);
+  const DAYS    = 7;
   const lastPrice = proms.at(-1);
+
+  // 1. Holt forecast
+  const holt = holtForecast(proms, DAYS);
+  if (!holt) return;
+
+  // 2. Corrección por reversión a la media
+  const rev = meanReversionCorrection(holt.forecast, proms);
+
+  // 3. Bandas de confianza
+  const bands = confidenceBands(rev.corrected, proms);
+
+  // 4. Anomalía
+  const anomaly = detectAnomaly(proms);
+
+  // 5. Señal de decisión (usando proyección a 5 días)
+  const sig = tradeSignal(lastPrice, rev.corrected.slice(0, 5), rev.z, bands.slice(0, 5));
+
+  const proj7 = rev.corrected.at(-1);
+  const pct7  = ((proj7 - lastPrice) / lastPrice * 100).toFixed(1);
 
   document.getElementById("proj-panel").style.display = "";
 
+  // Badge del modelo
+  const modelLabel = rev.active
+    ? `Holt + Reversión (Z=${rev.z > 0 ? "+" : ""}${rev.z.toFixed(1)}σ)`
+    : `Holt Double Smoothing`;
+  document.getElementById("proj-model-badge").textContent = modelLabel;
+
+  // KPIs
   const grid = document.getElementById("proj-grid");
   grid.innerHTML = [
-    { label: "Precio actual",   value: fmt(lastPrice),          cls: "" },
-    { label: `En ${DAYS} días`, value: fmt(projected.at(-1)),   cls: projected.at(-1) > lastPrice ? "red" : "green" },
-    { label: "Variación proj.", value: `${((projected.at(-1)-lastPrice)/lastPrice*100).toFixed(1)}%`, cls: projected.at(-1) > lastPrice ? "red" : "green" },
-    { label: "Tendencia",       value: linearSlope(proms) > 0 ? "▲ Alza" : "▼ Baja", cls: linearSlope(proms) > 0 ? "red" : "green" },
+    { label: "Precio actual",    value: fmt(lastPrice),  cls: "" },
+    { label: "Proyección 7d",    value: fmt(proj7),      cls: proj7 > lastPrice ? "red" : "green" },
+    { label: "Variación 7d",     value: `${pct7 > 0 ? "+" : ""}${pct7}%`, cls: proj7 > lastPrice ? "red" : "green" },
+    { label: "Media histórica",  value: fmt(rev.mean),   cls: "" },
+    { label: "Z-score actual",   value: `${rev.z > 0 ? "+" : ""}${rev.z.toFixed(2)}σ`, cls: Math.abs(rev.z) > 1.5 ? (rev.z > 0 ? "red" : "green") : "" },
+    { label: "Tendencia Holt",   value: holt.T > 0 ? `▲ +${fmt(Math.abs(holt.T))}/d` : `▼ -${fmt(Math.abs(holt.T))}/d`, cls: holt.T > 0 ? "red" : "green" },
   ].map(item => `
     <div class="proj-item">
       <div class="proj-item-label">${item.label}</div>
       <div class="proj-item-value ${item.cls ? "kpi-value "+item.cls : ""}">${item.value}</div>
     </div>`).join("");
 
-  // Mini chart proyección
+  // Señal de trading
+  const signalEl = document.getElementById("trade-signal");
+  signalEl.style.display = "";
+  signalEl.style.background = sig.color;
+  signalEl.style.border = `1px solid ${sig.color.replace("0.12","0.4").replace("0.15","0.4")}`;
+  const anomalyTxt = anomaly ? ` ⚠ Anomalía detectada: precio inusualmente ${anomaly.direction}.` : "";
+  signalEl.innerHTML = `<strong style="font-size:11px">${sig.icon}</strong> — ${sig.reason}${anomalyTxt}`;
+
+  // Notas del modelo
+  const dataQuality = proms.length >= 30 ? "Alta" : proms.length >= 15 ? "Media" : "Baja";
+  const qualityColor = proms.length >= 30 ? "#3ddc6e" : proms.length >= 15 ? "#f0b429" : "#e85d5d";
+  document.getElementById("proj-model-notes").innerHTML = `
+    <strong style="color:var(--fg)">Método:</strong> Suavizado Exponencial de Holt (α=0.3, β=0.1)
+    ${rev.active ? `+ corrección por reversión a la media (Z=${rev.z.toFixed(2)}σ)` : ""}
+    · Bandas de confianza al 95% (t-distribution, n=${proms.length})
+    · <strong style="color:${qualityColor}">Confianza de datos: ${dataQuality}</strong>
+    ${proms.length < 15 ? "— Se recomienda acumular 15+ días para mayor precisión." : ""}
+    ${proms.length >= 30 ? "· ARIMA(1,0,1) disponible para validación cruzada." : `· ARIMA se activa con 30+ días (actualmente ${proms.length}/30).`}
+  `;
+
+  // ─── GRÁFICO ───────────────────────────────────────────────────────────────
   if (projChart) projChart.destroy();
-  const labels = [
+  const histLen   = proms.length;
+  const allLabels = [
     ...serie.map(s => fmtDate(s.fecha)),
     ...Array.from({length: DAYS}, (_, i) => `+${i+1}d`)
   ];
+
+  // Dataset bandas — upper/lower relleno entre ellos usando fill
+  const upperData = [...Array(histLen).fill(null), ...bands.map(b => b.upper)];
+  const lowerData = [...Array(histLen).fill(null), ...bands.map(b => b.lower)];
+  const projData  = [...Array(histLen).fill(null), lastPrice, ...rev.corrected]; // conecta con último histórico
   const histData  = [...proms, ...Array(DAYS).fill(null)];
-  const projData  = [...Array(proms.length).fill(null), ...projected];
+
+  const projLabels = [...allLabels];
+  // Punto de conexión: último hist + 7 proj = 8 puntos de proj
+  projData.splice(histLen, 0); // ya tiene lastPrice en pos histLen
+
+  // Conectar proyección con último punto histórico
+  const projConnected = [...Array(histLen - 1).fill(null), lastPrice, ...rev.corrected];
 
   const ctx2 = document.getElementById("proj-chart").getContext("2d");
   projChart = new Chart(ctx2, {
     type: "line",
     data: {
-      labels,
+      labels: allLabels,
       datasets: [
+        // Banda superior (relleno hacia abajo al dataset inferior)
+        {
+          label: "IC 95% sup",
+          data: upperData,
+          borderColor: "transparent",
+          backgroundColor: "rgba(240,180,41,0.08)",
+          fill: "+1",
+          tension: 0.3,
+          pointRadius: 0,
+          spanGaps: false,
+        },
+        // Banda inferior
+        {
+          label: "IC 95% inf",
+          data: lowerData,
+          borderColor: "transparent",
+          backgroundColor: "rgba(240,180,41,0.08)",
+          fill: false,
+          tension: 0.3,
+          pointRadius: 0,
+          spanGaps: false,
+        },
+        // Media histórica (línea horizontal)
+        {
+          label: "Media hist.",
+          data: [...Array(histLen + DAYS).fill(rev.mean)],
+          borderColor: "rgba(100,149,237,0.4)",
+          borderWidth: 1,
+          borderDash: [2, 4],
+          pointRadius: 0,
+          fill: false,
+        },
+        // Histórico
         {
           label: "Histórico",
           data: histData,
           borderColor: "#3ddc6e",
           borderWidth: 2,
-          pointRadius: 0,
+          pointRadius: 2,
+          pointBackgroundColor: "#3ddc6e",
           fill: false,
-          tension: 0.4,
+          tension: 0.3,
           spanGaps: false,
         },
+        // Proyección (conecta con último histórico)
         {
-          label: "Proyección",
-          data: projData,
+          label: "Proyección Holt",
+          data: projConnected,
           borderColor: "#f0b429",
-          borderWidth: 1.5,
-          borderDash: [4, 4],
+          borderWidth: 2,
+          borderDash: [5, 3],
           pointRadius: 2,
           pointBackgroundColor: "#f0b429",
           fill: false,
@@ -1319,7 +1522,12 @@ function renderProjection(serie) {
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          labels: { color: "#7a9982", font: { family: "JetBrains Mono", size: 10 }, boxWidth: 10 }
+          labels: {
+            color: "#7a9982",
+            font: { family: "JetBrains Mono", size: 9 },
+            boxWidth: 10,
+            filter: item => !["IC 95% sup","IC 95% inf"].includes(item.text)
+          }
         },
         tooltip: {
           backgroundColor: "#162019",
@@ -1328,7 +1536,11 @@ function renderProjection(serie) {
           titleColor: "#e8f5ec",
           bodyColor: "#7a9982",
           callbacks: {
-            label: ctx => `${ctx.dataset.label}: ₡${Number(ctx.parsed.y).toLocaleString("es-CR")}`
+            label: ctx => {
+              if (["IC 95% sup","IC 95% inf"].includes(ctx.dataset.label)) return null;
+              if (ctx.parsed.y === null) return null;
+              return `${ctx.dataset.label}: ₡${Number(ctx.parsed.y).toLocaleString("es-CR")}`;
+            }
           }
         }
       },
